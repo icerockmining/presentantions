@@ -374,11 +374,50 @@ select.input option {
   color: var(--light);
 }
 
-/* tabs (product page) */
+/* tabs (product page) — pure CSS, radio-driven */
 .tab-input {
   position: absolute;
   opacity: 0;
   pointer-events: none;
+}
+.pdp-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  border-bottom: 1px solid var(--border);
+}
+.pdp-tab-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 0 0 14px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.pdp-tab-label:hover {
+  color: #cfe3e2;
+}
+.pdp-tab-panels {
+  flex-basis: 100%;
+  padding-top: 28px;
+}
+.pdp-panel {
+  display: none;
+}
+/* Tab 1 */
+#tab-specs:checked ~ .pdp-tab-panels .pdp-panel[data-tab="specs"],
+#tab-delivery:checked ~ .pdp-tab-panels .pdp-panel[data-tab="delivery"],
+#tab-warranty:checked ~ .pdp-tab-panels .pdp-panel[data-tab="warranty"] {
+  display: block;
+}
+.tab-input:checked + .pdp-tab-label {
+  color: #fff;
+  border-bottom-color: var(--accent);
+}
+.tab-input:focus-visible + .pdp-tab-label {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* utility */
