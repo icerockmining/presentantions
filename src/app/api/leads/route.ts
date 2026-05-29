@@ -10,6 +10,10 @@ type IncomingLead = {
   message?: string;
 };
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Allow digits, spaces, +, -, (), then require 7–15 digits total.
+const PHONE_RE = /^\+?[\d\s().-]{7,20}$/;
+
 export async function POST(req: Request) {
   let body: IncomingLead;
   try {
@@ -22,12 +26,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Укажите контактное лицо и email" }, { status: 400 });
   }
 
+  const email = body.email.trim();
+  if (!EMAIL_RE.test(email)) {
+    return NextResponse.json({ error: "Некорректный email" }, { status: 400 });
+  }
+  const phone = (body.phone || "").trim();
+  // Phone is optional, but if provided it must look like a real phone (optional
+  // leading +, digits and separators) and contain 7–15 digits — reject junk.
+  const phoneDigits = phone.replace(/\D/g, "").length;
+  if (phone && (!PHONE_RE.test(phone) || phoneDigits < 7 || phoneDigits > 15)) {
+    return NextResponse.json({ error: "Некорректный телефон" }, { status: 400 });
+  }
+
   const lead = await prisma.lead.create({
     data: {
       company: body.company || null,
       contact: body.contact,
-      email: body.email,
-      phone: body.phone || null,
+      email,
+      phone: phone || null,
       category: body.category || null,
       message: body.message || null,
       status: "new",

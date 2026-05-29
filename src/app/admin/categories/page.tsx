@@ -1,5 +1,6 @@
 import { AdminShell, AdminHeading } from "@/components/admin/AdminShell";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 import { saveCategory, deleteCategory } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -7,6 +8,7 @@ export const dynamic = "force-dynamic";
 const ICONS = ["server", "storage", "network", "gpu", "parts"];
 
 export default async function AdminCategories() {
+  await requireAdmin();
   const categories = await prisma.category.findMany({
     orderBy: { sortOrder: "asc" },
     include: { _count: { select: { products: true } } },

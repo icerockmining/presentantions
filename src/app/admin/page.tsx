@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { AdminShell, AdminHeading } from "@/components/admin/AdminShell";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminHome() {
+  await requireAdmin();
   const [products, categories, vendors, posts, orders, leads] = await Promise.all([
     prisma.product.count(),
     prisma.category.count(),

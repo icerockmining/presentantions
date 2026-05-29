@@ -1,10 +1,12 @@
 import { AdminShell, AdminHeading } from "@/components/admin/AdminShell";
 import { ProductForm } from "@/components/admin/ProductForm";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewProduct() {
+  await requireAdmin();
   const [categories, vendors] = await Promise.all([
     prisma.category.findMany({ orderBy: { sortOrder: "asc" } }),
     prisma.vendor.findMany({ orderBy: { name: "asc" } }),

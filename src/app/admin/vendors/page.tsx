@@ -1,10 +1,12 @@
 import { AdminShell, AdminHeading } from "@/components/admin/AdminShell";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 import { saveVendor, deleteVendor } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminVendors() {
+  await requireAdmin();
   const vendors = await prisma.vendor.findMany({
     orderBy: { name: "asc" },
     include: { _count: { select: { products: true } } },

@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
 
@@ -7,7 +8,15 @@ const COOKIE = "cgr_admin";
 const MAX_AGE = 60 * 60 * 8; // 8 hours
 
 function secret(): string {
-  return process.env.AUTH_SECRET || "dev-secret-change-in-production-please-32chars";
+  const s = process.env.AUTH_SECRET;
+  // Fail-fast: no hardcoded fallback. A weak/missing key would let anyone forge
+  // admin session cookies, so we refuse to sign or verify without a strong secret.
+  if (!s || s.length < 32) {
+    throw new Error(
+      "AUTH_SECRET is missing or too short. Set a random string of at least 32 characters (e.g. `openssl rand -hex 32`)."
+    );
+  }
+  return s;
 }
 
 function sign(value: string): string {
@@ -61,8 +70,12 @@ export async function getAdminId(): Promise<string | null> {
   return verifyToken(jar.get(COOKIE)?.value);
 }
 
+// Server-side auth guard for admin pages/actions. This is the REAL guarantee:
+// every protected admin server page must call this at the very top, before any
+// DB access, so unauthenticated requests never trigger queries or leak data.
+// Redirects to the login page when there is no valid session.
 export async function requireAdmin(): Promise<string> {
   const id = await getAdminId();
-  if (!id) throw new Error("UNAUTHORIZED");
+  if (!id) redirect("/admin/login");
   return id;
 }

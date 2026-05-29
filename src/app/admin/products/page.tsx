@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { AdminShell, AdminHeading } from "@/components/admin/AdminShell";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 import { quickUpdateProduct, deleteProduct } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminProducts() {
+  await requireAdmin();
   const products = await prisma.product.findMany({
     orderBy: { name: "asc" },
     include: { category: true, vendor: true },

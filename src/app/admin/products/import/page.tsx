@@ -1,10 +1,12 @@
 import { AdminShell, AdminHeading } from "@/components/admin/AdminShell";
 import { ImportClient } from "@/components/admin/ImportClient";
 import { CSV_COLUMNS } from "@/lib/csv";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export default function ImportPage() {
+export default async function ImportPage() {
+  await requireAdmin();
   return (
     <AdminShell>
       <AdminHeading title="Импорт товаров из CSV" />
