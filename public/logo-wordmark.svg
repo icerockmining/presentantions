@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="190" height="26" viewBox="0 0 190 26">
+  <g fill="none">
+    <circle cx="13" cy="13" r="11" stroke="#2a9f9e" stroke-width="2.2"/>
+    <path d="M9 13l2.6 2.6L17 9.5" stroke="#5bd0ce" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="32" y="13" dominant-baseline="central" font-family="Manrope, Arial, sans-serif" font-size="15.5" font-weight="800" fill="#ffffff" letter-spacing="-0.01em">Cashes Green</text>
+  <text x="158" y="13" dominant-baseline="central" font-family="Manrope, Arial, sans-serif" font-size="15.5" font-weight="800" fill="#5bd0ce" letter-spacing="-0.01em">Rus</text>
+</svg>
