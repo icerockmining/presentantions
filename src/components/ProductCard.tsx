@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Icon } from "./Icon";
 import { Badge, badgeTone } from "./Badge";
 import { CardActions } from "./cart/ProductActions";
-import { formatRub } from "@/lib/site";
+import { formatRub, stockLabel } from "@/lib/site";
 import type { ProductWithRel } from "@/lib/queries";
 
 export function ProductCard({ product }: { product: ProductWithRel }) {
@@ -72,6 +72,9 @@ export function ProductCard({ product }: { product: ProductWithRel }) {
           {product.price != null && (
             <div style={{ fontSize: 11, color: "#6c8584", marginTop: 2 }}>по курсу ЦБ РФ · с НДС</div>
           )}
+          <div style={{ fontSize: 11.5, marginTop: 4, fontWeight: 600, color: stockLabel(product.stockLocation).inStock ? "#5bd0ce" : "#9fb6b5" }}>
+            {stockLabel(product.stockLocation).text}
+          </div>
         </div>
 
         <CardActions

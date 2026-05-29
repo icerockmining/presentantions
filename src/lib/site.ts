@@ -22,6 +22,13 @@ export function abs(path: string): string {
   return `${SITE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
 }
 
+// Stock availability label derived from stockLocation so the UI never contradicts
+// the JSON-LD availability mapping (moscow → InStock, order → BackOrder).
+export function stockLabel(stockLocation: string): { text: string; inStock: boolean } {
+  if (stockLocation === "moscow") return { text: "В наличии · склад в Москве", inStock: true };
+  return { text: "Под заказ ~57 дней", inStock: false };
+}
+
 export function formatRub(n: number | null | undefined): string {
   if (n == null) return "Цена по запросу";
   return new Intl.NumberFormat("ru-RU").format(n) + " ₽";

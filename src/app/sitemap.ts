@@ -11,7 +11,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/delivery`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${SITE_URL}/payment`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${SITE_URL}/blog`, changeFrequency: "weekly", priority: 0.6 },
-    { url: `${SITE_URL}/rfq`, changeFrequency: "monthly", priority: 0.5 },
+    // /rfq is intentionally excluded from the sitemap (per SPEC) — it is a write-only
+    // RFQ form, not an indexable content page (also Disallowed in robots.ts).
   ];
 
   try {

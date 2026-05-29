@@ -8,7 +8,7 @@ import { ProductCard } from "@/components/ProductCard";
 import { PdpActions } from "@/components/cart/ProductActions";
 import { JsonLd, breadcrumbLd, productLd } from "@/lib/jsonld";
 import { getProductBySlug, getRelatedProducts, getAllProductSlugs } from "@/lib/queries";
-import { formatRub, SITE_URL } from "@/lib/site";
+import { formatRub, SITE_URL, stockLabel } from "@/lib/site";
 
 export const revalidate = 1800;
 export const dynamicParams = true;
@@ -84,7 +84,9 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           <div style={{ position: "relative", borderRadius: 20, border: "1px solid var(--border)", background: "radial-gradient(ellipse at 50% 35%, #143352 0%, #0a141e 78%)", height: 420, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <div style={{ position: "absolute", top: 18, left: 18, display: "flex", gap: 8 }}>
               {p.badge && <Badge tone={badgeTone(p.badge)}>{p.badge}</Badge>}
-              {p.inStock ? <Badge tone="green">В наличии</Badge> : <Badge tone="slate">Под заказ</Badge>}
+              {stockLabel(p.stockLocation).inStock
+                ? <Badge tone="green">В наличии</Badge>
+                : <Badge tone="slate">Под заказ</Badge>}
             </div>
             <div style={{ position: "absolute", top: 18, right: 18, fontSize: 14, fontWeight: 700, color: "#6c8584" }}>{p.vendor.name}</div>
             <Icon name={p.category.icon} size={150} stroke="var(--accent)" sw={0.8} />
@@ -120,6 +122,9 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
             ) : (
               <div style={{ fontSize: 13, color: "#8aa3a2", marginTop: 6 }}>Стоимость рассчитывается индивидуально под вашу конфигурацию</div>
             )}
+            <div style={{ fontSize: 13, color: stockLabel(p.stockLocation).inStock ? "#5bd0ce" : "#9fb6b5", marginTop: 6, fontWeight: 600 }}>
+              {stockLabel(p.stockLocation).text}
+            </div>
 
             <PdpActions
               product={{

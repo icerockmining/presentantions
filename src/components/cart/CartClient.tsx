@@ -38,7 +38,7 @@ export function CartClient() {
   const [step, setStep] = React.useState<Step>("cart");
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [result, setResult] = React.useState<{ orderNumber: string; invoice: Invoice } | null>(null);
+  const [result, setResult] = React.useState<{ orderNumber?: string; invoice?: Invoice; rfq?: boolean } | null>(null);
 
   const [form, setForm] = React.useState({
     company: "",
@@ -77,7 +77,7 @@ export function CartClient() {
         setError(data.error || "Не удалось оформить заявку.");
         return;
       }
-      setResult({ orderNumber: data.orderNumber, invoice: data.invoice });
+      setResult({ orderNumber: data.orderNumber, invoice: data.invoice, rfq: data.rfq });
       clearCart();
       setStep("done");
     } catch {
@@ -98,14 +98,20 @@ export function CartClient() {
         <div style={{ width: 76, height: 76, borderRadius: 999, background: "rgba(40,180,110,0.15)", border: "1px solid rgba(40,180,110,0.35)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}>
           <Icon name="check" size={34} stroke="#46c98a" sw={2.5} />
         </div>
-        <h1 style={{ fontSize: 32, fontWeight: 700, color: "#fff", marginBottom: 12 }}>Заявка оформлена!</h1>
-        <p style={{ fontSize: 15, color: "#8aa3a2", lineHeight: 1.6, marginBottom: 8 }}>
-          Номер заявки: <strong style={{ color: "#cfe3e2" }}>{result.orderNumber}</strong>
-        </p>
+        <h1 style={{ fontSize: 32, fontWeight: 700, color: "#fff", marginBottom: 12 }}>
+          {result.rfq ? "Запрос КП отправлен!" : "Заявка оформлена!"}
+        </h1>
+        {result.orderNumber && (
+          <p style={{ fontSize: 15, color: "#8aa3a2", lineHeight: 1.6, marginBottom: 8 }}>
+            Номер заявки: <strong style={{ color: "#cfe3e2" }}>{result.orderNumber}</strong>
+          </p>
+        )}
         <p style={{ fontSize: 16, color: "#8aa3a2", lineHeight: 1.6, marginBottom: 24 }}>
-          Личный менеджер свяжется с вами в ближайшее рабочее время, подтвердит наличие и выставит счёт в рублях по курсу ЦБ РФ.
+          {result.rfq
+            ? "Менеджер подготовит коммерческое предложение по запрошенным позициям и свяжется с вами в ближайшее рабочее время."
+            : "Личный менеджер свяжется с вами в ближайшее рабочее время, подтвердит наличие и выставит счёт в рублях по курсу ЦБ РФ."}
         </p>
-        {result.invoice.totalWithVat > 0 && (
+        {result.invoice && result.invoice.totalWithVat > 0 && (
           <div style={{ textAlign: "left", maxWidth: 460, margin: "0 auto 28px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)", borderRadius: 14, padding: 22 }}>
             <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#6c8584", marginBottom: 14 }}>Счёт-заготовка</div>
             <SumRow label="Сумма без НДС" value={formatRub(result.invoice.netAmount)} />

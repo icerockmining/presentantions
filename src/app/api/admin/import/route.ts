@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { getAdminId } from "@/lib/auth";
 import { decodeBuffer, parseCsv, importRows, type Encoding } from "@/lib/csv";
 
 export const dynamic = "force-dynamic";
 
+const MAX_CSV_BYTES = 8 * 1024 * 1024; // 8 MB
+
 export async function POST(req: Request) {
-  try {
-    await requireAdmin();
-  } catch {
+  // API route: respond with 401 rather than redirect (no page navigation here).
+  if (!(await getAdminId())) {
     return NextResponse.json({ error: "Доступ запрещён" }, { status: 401 });
   }
 
@@ -18,6 +19,14 @@ export async function POST(req: Request) {
 
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "Файл не загружен" }, { status: 400 });
+  }
+
+  // Reject oversized files before reading them into memory.
+  if (file.size > MAX_CSV_BYTES) {
+    return NextResponse.json(
+      { error: `Файл слишком большой (${(file.size / 1024 / 1024).toFixed(1)} МБ). Максимум — 8 МБ.` },
+      { status: 413 }
+    );
   }
 
   const buf = Buffer.from(await file.arrayBuffer());

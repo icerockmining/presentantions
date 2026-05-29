@@ -6,8 +6,9 @@ export const size = OG_SIZE;
 export const contentType = OG_CONTENT_TYPE;
 export const alt = "Товар — Cashes Green Rus";
 
-export default async function Image({ params }: { params: { slug: string } }) {
-  const p = await getProductBySlug(params.slug);
+export default async function Image({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const p = await getProductBySlug(slug);
   if (!p) {
     return ogImage({ eyebrow: "Каталог", title: "Cashes Green Rus" });
   }

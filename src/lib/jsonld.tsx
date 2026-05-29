@@ -107,8 +107,12 @@ export function productLd(p: ProductWithRel) {
     url: abs(`/product/${p.slug}`),
   };
 
+  // Google requires Product.image for rich results. When a product has no uploaded
+  // images, fall back to its dynamic OG image so `image` is always present.
   if (p.images && p.images.length) {
     base.image = p.images.map((i) => abs(i));
+  } else {
+    base.image = abs(`/product/${p.slug}/opengraph-image`);
   }
 
   // For price === null we do NOT emit a price (invalid for Google).

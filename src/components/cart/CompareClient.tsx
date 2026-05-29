@@ -4,13 +4,14 @@ import * as React from "react";
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { useCart } from "./CartProvider";
-import { formatRub } from "@/lib/site";
+import { formatRub, stockLabel } from "@/lib/site";
 
 type CompareProduct = {
   slug: string;
   name: string;
   price: number | null;
   inStock: boolean;
+  stockLocation: string;
   vendorName: string;
   categoryName: string;
   categoryIcon: string;
@@ -104,7 +105,7 @@ export function CompareClient() {
           <tbody>
             <Row label="Производитель" stickyTd={stickyTd} products={products} render={(p) => p.vendorName} />
             <Row label="Категория" stickyTd={stickyTd} products={products} render={(p) => p.categoryName} />
-            <Row label="Наличие" stickyTd={stickyTd} products={products} render={(p) => (p.inStock ? "✓ В наличии" : "Под заказ")} highlight={(p) => p.inStock} />
+            <Row label="Наличие" stickyTd={stickyTd} products={products} render={(p) => stockLabel(p.stockLocation).text} highlight={(p) => stockLabel(p.stockLocation).inStock} />
             {specKeys.map((k) => (
               <Row key={k} label={k} stickyTd={stickyTd} products={products} render={(p) => p.specs?.[k] || "—"} />
             ))}

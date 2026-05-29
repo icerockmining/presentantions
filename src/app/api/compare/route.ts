@@ -22,6 +22,7 @@ export async function GET(req: Request) {
       name: p!.name,
       price: p!.price,
       inStock: p!.inStock,
+      stockLocation: p!.stockLocation,
       vendorName: p!.vendor.name,
       categoryName: p!.category.name,
       categoryIcon: p!.category.icon,

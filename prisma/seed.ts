@@ -319,6 +319,14 @@ async function main() {
     if (!categoryId) throw new Error(`Unknown category ${p.cat} for ${p.id}`);
     if (!vendorId) throw new Error(`Unknown vendor ${p.vendor} for ${p.id}`);
 
+    // Items with no price (КП), or whose badge signals "по запросу" / "Проектная
+    // поставка", are sourced to order — never "moscow" — so the availability label
+    // and JSON-LD stay consistent (e.g. huawei-2288 must NOT be moscow).
+    const badgeText = (p.badge || "").toLowerCase();
+    const isOrderOnly =
+      p.price == null || badgeText.includes("запрос") || badgeText.includes("проектная");
+    const stockLocation = isOrderOnly ? "order" : p.inStock ? "moscow" : "order";
+
     const data = {
       name: p.name,
       subtitle: p.subtitle,
@@ -328,7 +336,7 @@ async function main() {
       oldPrice: p.oldPrice,
       badge: p.badge,
       inStock: p.inStock,
-      stockLocation: p.inStock ? "moscow" : "order",
+      stockLocation,
       form: p.form,
       cpu: p.cpu,
       specs: p.specs,

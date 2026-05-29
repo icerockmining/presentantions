@@ -107,9 +107,15 @@ export function parseBool(v: string): boolean {
 export function parseIntOrNull(v: string): { ok: true; value: number | null } | { ok: false } {
   const t = v.trim();
   if (!t) return { ok: true, value: null };
-  const cleaned = t.replace(/[\s ]/g, "");
-  if (!/^-?\d+$/.test(cleaned)) return { ok: false };
-  return { ok: true, value: parseInt(cleaned, 10) };
+  // Allow space / non-breaking space ONLY as a thousands separator between digit
+  // groups (e.g. "1 234 567"). Any other internal whitespace (e.g. "1 2 3") is
+  // invalid and surfaces as a row error — never silently glued into one number.
+  const THOUSANDS = /^-?\d{1,3}(?:[  ]\d{3})*$/;
+  if (THOUSANDS.test(t)) {
+    return { ok: true, value: parseInt(t.replace(/[  ]/g, ""), 10) };
+  }
+  if (/^-?\d+$/.test(t)) return { ok: true, value: parseInt(t, 10) };
+  return { ok: false };
 }
 
 export function parsePipeList(v: string): string[] {
@@ -155,8 +161,17 @@ export async function importRows(rows: Record<string, string>[]): Promise<RowRep
     vendorIndex.set(v.name.toLowerCase(), v.id);
   }
 
+  // Preload all existing product slugs so generated slugs never collide with the DB
+  // (avoids P2002 on create). We grow this set as we generate/insert.
+  const existingSlugs = new Set<string>(
+    (await prisma.product.findMany({ select: { slug: true } })).map((p) => p.slug.toLowerCase())
+  );
+
   const reports: RowReport[] = [];
-  const usedSlugs = new Set<string>();
+  // Effective key (sku, else final slug) already seen in THIS file. Dedup policy:
+  // last row wins (it overwrites via upsert); the duplicate row is reported with a
+  // note so the operator knows an earlier row in the same file was overwritten.
+  const seenKeys = new Set<string>();
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -199,8 +214,10 @@ export async function importRows(rows: Record<string, string>[]): Promise<RowRep
       }
 
       const stockLocationRaw = get("stockLocation").toLowerCase();
-      const stockLocation = stockLocationRaw || "order";
-      if (stockLocation !== "moscow" && stockLocation !== "order") {
+      // Empty cell is allowed: on CREATE it defaults to "order", on UPDATE the
+      // existing value is preserved (handled below — we don't overwrite it).
+      const stockLocationProvided = stockLocationRaw !== "";
+      if (stockLocationProvided && stockLocationRaw !== "moscow" && stockLocationRaw !== "order") {
         reports.push({ line, key, action: "error", message: "stockLocation ∈ {moscow, order}" });
         continue;
       }
@@ -218,15 +235,31 @@ export async function importRows(rows: Record<string, string>[]): Promise<RowRep
         }
       }
 
-      // Generate slug from name if empty; resolve collisions within the file.
+      // Resolve the target row first (upsert by sku if given, else by slug).
+      const existing = sku
+        ? await prisma.product.findUnique({ where: { sku } })
+        : slug
+          ? await prisma.product.findUnique({ where: { slug } })
+          : null;
+
+      // Generate slug from name if empty (create path only). Resolve collisions
+      // against BOTH this file's slugs and existing DB slugs, so create never hits P2002.
       if (!slug) {
-        const base = slugify(name);
-        let candidate = base;
-        let n = 2;
-        while (usedSlugs.has(candidate)) candidate = `${base}-${n++}`;
-        slug = candidate;
+        if (existing) {
+          slug = existing.slug;
+        } else {
+          const base = slugify(name);
+          let candidate = base;
+          let n = 2;
+          while (existingSlugs.has(candidate.toLowerCase())) candidate = `${base}-${n++}`;
+          slug = candidate;
+        }
       }
-      usedSlugs.add(slug);
+
+      // Effective dedup key within this file.
+      const effKey = (sku || slug).toLowerCase();
+      const duplicateInFile = seenKeys.has(effKey);
+      seenKeys.add(effKey);
 
       const data = {
         sku: sku || null,
@@ -238,7 +271,6 @@ export async function importRows(rows: Record<string, string>[]): Promise<RowRep
         oldPrice: oldPriceParsed.value,
         badge: get("badge") || null,
         inStock: parseBool(get("inStock")),
-        stockLocation,
         form: get("form") || null,
         cpu: get("cpu") || null,
         specs,
@@ -246,17 +278,30 @@ export async function importRows(rows: Record<string, string>[]): Promise<RowRep
         images: parsePipeList(get("images")),
       };
 
-      // Upsert by sku (if given) else by slug.
-      const existing = sku
-        ? await prisma.product.findUnique({ where: { sku } })
-        : await prisma.product.findUnique({ where: { slug } });
-
       if (existing) {
-        await prisma.product.update({ where: { id: existing.id }, data: { ...data, slug: existing.slug } });
-        reports.push({ line, key, action: "updated", message: "Обновлён" });
+        // On update keep existing stockLocation when the cell is empty (item 14).
+        const updateData = stockLocationProvided
+          ? { ...data, stockLocation: stockLocationRaw }
+          : data;
+        await prisma.product.update({ where: { id: existing.id }, data: { ...updateData, slug: existing.slug } });
+        existingSlugs.add(existing.slug.toLowerCase());
+        reports.push({
+          line,
+          key,
+          action: "updated",
+          message: duplicateInFile ? "Обновлён (перезапись дубля из этого файла)" : "Обновлён",
+        });
       } else {
-        await prisma.product.create({ data: { ...data, slug } });
-        reports.push({ line, key, action: "created", message: "Создан" });
+        await prisma.product.create({
+          data: { ...data, slug, stockLocation: stockLocationProvided ? stockLocationRaw : "order" },
+        });
+        existingSlugs.add(slug.toLowerCase());
+        reports.push({
+          line,
+          key,
+          action: "created",
+          message: duplicateInFile ? "Создан (перезапись дубля из этого файла)" : "Создан",
+        });
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Неизвестная ошибка";
