@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env
+.env*.local
+.next
+node_modules
+README.md
+_design
+*.log
+dist
+coverage
+deploy
+nginx

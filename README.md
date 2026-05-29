@@ -118,6 +118,128 @@ su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /tmp/pgdata -o '-p 5432 -k 
 - `app/sitemap.ts` (с `lastModified`), `app/robots.ts`, динамические `opengraph-image`, `not-found`.
 - `<html lang="ru">`, один `<h1>` на страницу, семантический HTML.
 
+## Деплой на VPS
+
+Два варианта: **Docker Compose** (проще, изоляция) или **без Docker** (меньше накладных расходов).
+
+### Вариант A: Docker Compose
+
+```bash
+# 1. Клонировать репозиторий на сервере
+git clone https://github.com/icerockmining/presentantions /srv/cgr-shop
+cd /srv/cgr-shop
+
+# 2. Создать .env из шаблона и заполнить значения
+cp .env.example .env
+# Обязательные поля: POSTGRES_PASSWORD, ADMIN_EMAIL, ADMIN_PASSWORD,
+#                    AUTH_SECRET (32+ случайных байта), NEXT_PUBLIC_SITE_URL
+# Генерация AUTH_SECRET: openssl rand -hex 32
+
+# 3. Собрать и запустить
+docker compose up -d --build
+
+# 4. Применить миграции и залить данные (один раз)
+docker compose run --rm migrate
+
+# 5. Nginx (обратный прокси) — скопировать nginx/cgr.conf в /etc/nginx/sites-available/
+sudo ln -s /srv/cgr-shop/nginx/cgr.conf /etc/nginx/sites-enabled/cashesgreen.ru
+sudo nginx -t && sudo systemctl reload nginx
+
+# 6. SSL через Let's Encrypt
+sudo certbot --nginx -d cashesgreen.ru -d www.cashesgreen.ru
+```
+
+После этого приложение доступно на `https://cashesgreen.ru`. Контейнер `app` слушает только на `127.0.0.1:3000` — снаружи закрыт.
+
+**Обновление:**
+```bash
+git pull && docker compose up -d --build
+```
+
+---
+
+### Вариант B: без Docker (Node.js + systemd)
+
+Подходит для Ubuntu 22.04/24.04. Быстрый старт:
+
+```bash
+# Автоматическая установка всех зависимостей
+sudo bash /srv/cgr-shop/deploy/setup-vps.sh
+```
+
+Ручные шаги:
+
+```bash
+# 1. Node.js 20
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash -
+sudo apt install nodejs
+
+# 2. PostgreSQL 16
+sudo apt install postgresql-16
+
+# 3. База данных
+sudo -u postgres psql -c "CREATE USER cgr WITH PASSWORD 'strongpassword';"
+sudo -u postgres psql -c "CREATE DATABASE cgr_shop OWNER cgr;"
+
+# 4. Клонировать и собрать
+cd /srv && git clone https://github.com/icerockmining/presentantions cgr-shop
+cd cgr-shop && npm ci && npm run build
+
+# 5. Переменные окружения
+sudo mkdir -p /etc/cgr-shop
+sudo cp .env.example /etc/cgr-shop/.env
+sudo nano /etc/cgr-shop/.env        # заполнить все поля
+
+# 6. Миграции + seed
+DATABASE_URL=$(grep DATABASE_URL /etc/cgr-shop/.env | cut -d= -f2-) \
+  npx prisma migrate deploy && npm run seed
+
+# 7. Systemd-юнит
+sudo cp deploy/cgr-shop.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now cgr-shop
+sudo systemctl status cgr-shop
+
+# 8. Nginx + SSL (см. nginx/cgr.conf)
+sudo cp nginx/cgr.conf /etc/nginx/sites-available/cashesgreen.ru
+sudo ln -s /etc/nginx/sites-available/cashesgreen.ru /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d cashesgreen.ru -d www.cashesgreen.ru
+```
+
+**Обновление:**
+```bash
+cd /srv/cgr-shop
+git pull
+npm ci
+npm run build
+npx prisma migrate deploy
+sudo systemctl restart cgr-shop
+```
+
+---
+
+### Переменные окружения для продакшена
+
+Создайте `.env` (Docker) или `/etc/cgr-shop/.env` (systemd):
+
+```env
+# Docker Compose: POSTGRES_PASSWORD используется внутри docker-compose.yml
+POSTGRES_PASSWORD=сложный-пароль-к-базе
+
+DATABASE_URL=postgresql://cgr:сложный-пароль-к-базе@db:5432/cgr_shop
+
+ADMIN_EMAIL=admin@cashesgreen.ru
+ADMIN_PASSWORD=уникальный-пароль-смените-до-продакшена
+
+# Генерация: openssl rand -hex 32
+AUTH_SECRET=сюда-32-байта-случайного-hex
+
+NEXT_PUBLIC_SITE_URL=https://cashesgreen.ru
+```
+
+> **Безопасность:** `AUTH_SECRET` < 32 байт → приложение не запустится. Не коммитьте `.env`.
+
 ## Скрипты
 
 | Команда | Действие |

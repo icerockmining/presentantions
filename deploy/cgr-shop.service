@@ -1,0 +1,37 @@
+# systemd unit for Cashes Green Rus shop (without Docker)
+# Place at /etc/systemd/system/cgr-shop.service
+# Then: systemctl daemon-reload && systemctl enable --now cgr-shop
+#
+# Prerequisites:
+#   - Node.js 20 installed (https://github.com/nodesource/distributions)
+#   - PostgreSQL 16 running as system service
+#   - App built and in /srv/cgr-shop (npm run build)
+#   - Environment file at /etc/cgr-shop/.env
+
+[Unit]
+Description=Cashes Green Rus — Next.js shop
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/srv/cgr-shop
+EnvironmentFile=/etc/cgr-shop/.env
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cgr-shop
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/srv/cgr-shop/.next/cache
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
