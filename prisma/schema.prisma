@@ -1,0 +1,106 @@
+// Cashes Green Rus — Prisma schema
+// PostgreSQL. See _design/SPEC.md for the data model.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id             String    @id @default(cuid())
+  name           String
+  slug           String    @unique
+  icon           String
+  sortOrder      Int       @default(0)
+  description    String?
+  seoTitle       String?
+  seoDescription String?
+  products       Product[]
+  posts          Post[]
+}
+
+model Vendor {
+  id       String    @id @default(cuid())
+  name     String
+  slug     String    @unique
+  logoUrl  String?
+  products Product[]
+}
+
+model Product {
+  id             String   @id @default(cuid())
+  sku            String?  @unique
+  name           String
+  slug           String   @unique
+  subtitle       String?
+  categoryId     String
+  category       Category @relation(fields: [categoryId], references: [id])
+  vendorId       String
+  vendor         Vendor   @relation(fields: [vendorId], references: [id])
+  price          Int? // null => «Цена по запросу»
+  oldPrice       Int?
+  currency       String   @default("RUB")
+  badge          String?
+  inStock        Boolean  @default(true)
+  stockLocation  String   @default("order") // "moscow" | "order"
+  form           String?
+  cpu            String?
+  specs          Json     @default("{}")
+  tags           String[] @default([])
+  images         String[] @default([])
+  seoTitle       String?
+  seoDescription String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([vendorId])
+}
+
+model Order {
+  id          String   @id @default(cuid())
+  number      String   @unique
+  status      String   @default("new") // new | invoiced | paid | shipped | cancelled
+  customer    Json
+  items       Json
+  total       Int      @default(0)
+  vatIncluded Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+model Lead {
+  id        String   @id @default(cuid())
+  company   String?
+  contact   String
+  email     String
+  phone     String?
+  category  String?
+  message   String?
+  status    String   @default("new") // new | processing | closed
+  createdAt DateTime @default(now())
+}
+
+model Post {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  excerpt     String
+  body        String
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id])
+  coverUrl    String?
+  tag         String?
+  readMins    Int       @default(5)
+  publishedAt DateTime  @default(now())
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}

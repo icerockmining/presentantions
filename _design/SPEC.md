@@ -135,6 +135,50 @@ Border rgba(255,255,255,0.08)
 6. Админка: auth + CRUD + Orders/Leads + **CSV-импорт**.
 7. SEO-полировка (метаданные, structured data, sitemap, CWV), README, .env.example.
 
+## Усиленные решения (v2, после адверсариальной критики плана) — ОБЯЗАТЕЛЬНО
+
+### Архитектура server/client
+- Публичные страницы (`/`, `/catalog`, `/catalog/[category]`, `/product/[slug]`, `/blog`, `/blog/[slug]`, `/delivery`, `/payment`) — **серверные компоненты**, данные из Prisma. Никакого порта монолитного `App()` из прототипа.
+- Прототип написан как client-SPA (всё состояние в `useState`, hover через `useState`). При порте: **hover-эффекты и адаптив — через CSS (globals.css / CSS-модуль с `:hover` и `@media`), НЕ через useState**, чтобы `ProductCard`, `Btn`, header/footer оставались серверными. Это критично для RSC-выгоды на каталоге.
+- `ShopHeader`/`ShopFooter` — серверные; интерактив вынести в узкие client-острова: `MobileMenuToggle`, `CartBadge`, `CompareBadge`, `HeaderSearch`.
+- Корзина и сравнение — `CartProvider`/`CompareProvider` (React Context, client, в `layout`), персист в `localStorage`. Бейджи количества на сервере рендерятся как 0/пусто и заполняются в `useEffect` (или `useSyncExternalStore` с серверным снапшотом) — **избегать hydration mismatch**.
+- Навигация — настоящими `<Link href>` (для SEO), а не `onClick`. Ссылки строить как `/product/${slug}`, `/catalog/${categorySlug}`.
+- Выкинуть мусор прототипа: `useTweaks`/`TweaksPanel`, `window.__resources`, `window.SHOP_DATA`, Babel-standalone. `accent` = CSS-токен `#2a9f9e` (не prop-drilling).
+
+### Маппинг данных при сидировании
+- `data.js`: `Product.id` (`dell-r760`) → `slug`; `cat` (строка) → `Category` по `slug`; `vendor` (строка) → `Vendor` по `slug`. Категории/вендоры создать первыми, товары ссылать по FK.
+- Логотипы вендоров: в прототипе абсолютные URL чужого прод-сайта. Не зависеть от них — положить плейсхолдеры/SVG локально в `/public/vendors/` (можно простые текстовые/однотонные), либо для `next/image` настроить `remotePatterns`. Предпочесть локальные ассеты.
+
+### Каталог: фильтры и SEO
+- Фильтры (`category`, `vendor`, `inStock`, `hasPrice`, `sort`) — через **URL `searchParams`**, серверная фильтрация Prisma. Client-остров только для UI-контролов, которые пушат в URL (`useRouter`).
+- **Канонизация:** индексируемы только «чистые» URL `/catalog` и `/catalog/[category]`. Любые фильтры/сортировка/пагинация в query → `<meta name="robots" content="noindex,follow">` + `<link rel="canonical">` на базовый URL категории. Пагинация (`?page=N`) — self-canonical, без rel=prev/next.
+
+### SEO — расширения (обязательно)
+- JSON-LD `Product`/`Offer`: `priceCurrency="RUB"`, `availability` (маппинг: `stockLocation=moscow`→`https://schema.org/InStock`; `order`→`https://schema.org/BackOrder`/`PreOrder`), `itemCondition=NewCondition`, `priceValidUntil`, `brand` (из Vendor), `sku`, `image` (абсолютные URL). Для `price=null` — **НЕ выдавать `Offer.price`** (невалидно для Google); опустить offers или дать только availability.
+- `Organization`/`LocalBusiness` с `logo`, `address`, `telephone`, `openingHours`, `sameAs` (если есть соцсети — иначе опустить). `WebSite` + `SearchAction` (sitelinks searchbox).
+- Динамические OG-картинки через `next/og` `ImageResponse`: `opengraph-image.tsx` для товара (название+цена+бренд), категории, статьи.
+- `app/sitemap.ts`: `lastModified` из `updatedAt`/`publishedAt`, `changeFrequency`, `priority`; включать только канонические индексируемые URL (товары, категории, статьи, статические); исключить admin/cart/checkout/compare/rfq и фильтрованные URL.
+- `app/robots.ts`: ссылка на sitemap; `Disallow: /admin`, `/api`, `/cart`, `/checkout`, `/compare`.
+- `not-found.tsx` + `notFound()` для несуществующих slug → HTTP 404. Удалённые товары → 404.
+- Язык: только `<html lang="ru">` + `og:locale=ru_RU`. **Никакого hreflang** (моноязычный сайт).
+- `generateStaticParams`: оборачивать запрос к БД в try/catch (вернуть `[]` если БД недоступна) + `export const dynamicParams = true` + `revalidate`, чтобы `next build` не падал без БД. В этом контейнере БД доступна.
+- НДС: ставка **22%** (как в брифе и фактах компании). НЕ копировать опечатку «с НДS» из прототипа — писать «с НДС».
+
+### CSV-импорт — расширения (обязательно)
+- **Кодировка:** селектор Авто/UTF-8/Windows-1251. Автодетект (BOM + эвристика). Перекодировка `win1251`→`utf8` через `iconv-lite` на сервере ДО парсинга. Тест: файл в Windows-1251 с кириллицей — имена не искажены.
+- **Разделитель:** автодетект `,`/`;`/`\t` (русский Excel по умолчанию `;`). Кавычки по RFC 4180 (`""`).
+- **Колонки-массивы/JSON:** `specs` = JSON-объект (при ошибке — построчная ошибка, импорт не падает); `tags`/`images` = разделитель внутри ячейки `|` (прописать в шаблоне).
+- **Стратегия:** распарсить+валидировать все строки, импортировать построчно (НЕ одна глобальная транзакция, иначе нет построчного отчёта); `upsert` по `sku` (если задан) иначе по `slug`; пустой `slug` → генерация транслитерацией из `name` + разрешение коллизий; дубль внутри файла — последняя строка побеждает (или ошибка — на усмотрение, задокументировать).
+- **Валидация:** `price`/`oldPrice` — целые рубли (`Int`); `inStock` ∈ {true,1,да,yes}; `stockLocation` ∈ {moscow,order}; `category`/`vendor` по slug/name (если нет — ошибка строки, не создавать молча).
+- **CSV injection:** при генерации шаблона/экспорта/отчёта санитизировать ячейки, начинающиеся с `= + - @ \t \r` (префикс `'`).
+- **Отчёт:** построчно (номер строки, ключ, действие created/updated/skipped/error, текст ошибки), скачиваемый CSV (с санитизацией). Скачиваемый шаблон CSV.
+
+### Приёмочные SEO-проверки (добавить в DoD)
+- Smoke-скрипт: `fetch` SSR-страницы товара → грепом проверить наличие `<title>`, `rel="canonical"`, `og:`, ровно одного `<h1>`, блока `application/ld+json`; `JSON.parse` JSON-LD + проверка required-полей.
+- `/sitemap.xml` и `/robots.txt` → 200 + корректный content-type; sitemap содержит 17 товаров, не содержит admin/cart.
+- Фильтрованный URL каталога → `noindex`; чистый → индексируемый.
+- Несуществующий slug → HTTP 404.
+
 ## Definition of Done
 
 - `npm run build` проходит без ошибок; `npm run lint` чисто.
