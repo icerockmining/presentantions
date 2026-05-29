@@ -334,7 +334,7 @@ async function main() {
       specs: p.specs,
       tags: p.tags,
       images: [],
-      seoTitle: `${p.name} — купить в Cashes Green Rus`,
+      seoTitle: `${p.name} — купить`,
       seoDescription: p.subtitle,
     };
 
