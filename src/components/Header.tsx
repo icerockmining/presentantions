@@ -65,6 +65,26 @@ export async function Header() {
           </a>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
             <CompareBadge />
+            <a
+              href={`tel:${COMPANY.phoneHref}`}
+              aria-label="Позвонить"
+              className="show-mobile"
+              style={{
+                display: "none",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 40,
+                height: 40,
+                borderRadius: 10,
+                background: "rgba(42,159,158,0.18)",
+                border: "1px solid rgba(42,159,158,0.4)",
+                color: "var(--accent)",
+                textDecoration: "none",
+                flexShrink: 0,
+              }}
+            >
+              <Icon name="phone" size={19} stroke="var(--accent)" sw={2} />
+            </a>
             <CartBadge />
             <MobileMenu categories={categories.map((c) => ({ slug: c.slug, name: c.name }))} />
           </div>
